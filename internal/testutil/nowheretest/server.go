@@ -56,12 +56,7 @@ func StartPortal(t *testing.T, morph bool) (string, string, *tls.Config) {
 	if err := os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}), 0600); err != nil {
 		t.Fatal(err)
 	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	address := listener.Addr().String()
-	listener.Close()
+	address := freePortalAddress(t)
 	query := url.Values{"tls": {"2"}, "crt": {certPath}, "key": {keyPath}, "morph": {"0"}}
 	if morph {
 		query.Set("morph", "1")
@@ -109,6 +104,28 @@ func StartPortal(t *testing.T, morph bool) (string, string, *tls.Config) {
 	roots.AppendCertsFromPEM(certPEM)
 	digest := sha256.Sum256(der)
 	return address, hex.EncodeToString(digest[:]), &tls.Config{ServerName: "localhost", RootCAs: roots}
+}
+
+// freePortalAddress returns a loopback port that is free for both TCP and UDP, because
+// Portal listens on both. Windows reserves port ranges (Hyper-V, WinNAT) where a TCP
+// port may be free while binding UDP fails with WSAEACCES.
+func freePortalAddress(t *testing.T) string {
+	t.Helper()
+	for range 50 {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		address := listener.Addr().String()
+		packet, err := net.ListenPacket("udp", address)
+		listener.Close()
+		if err == nil {
+			packet.Close()
+			return address
+		}
+	}
+	t.Fatal("no loopback port is free for both TCP and UDP")
+	return ""
 }
 
 func EchoTargets(t *testing.T) (nowhere.Target, nowhere.Target) {
