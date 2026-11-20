@@ -65,7 +65,7 @@ CGO_ENABLED=1 go build -tags with_gvisor,with_naive
 
 For native Linux (including musl) and Android/iOS builds, follow the [cronet-go toolchain instructions](https://github.com/SagerNet/cronet-go#downstream-build-requirements) and add `with_naive` to your existing tags. Linux CGO builds require the Chromium toolchain; musl additionally requires `with_musl`. Android needs the NDK and Apple targets need Xcode. Availability and minimum OS/libc versions are constrained by the pinned native library, rather than mihomo's ordinary build matrix.
 
-Ordinary builds without `with_naive` keep native dependencies out of the executable. Parsing a Naive node then reports the missing build tag. `mihomo -v` lists `with_naive` when compiled in. The existing general release workflow builds these ordinary binaries; the separate Naive workflow uploads the complete Naive bundles.
+Ordinary builds without `with_naive` keep native dependencies out of the executable. Parsing a Naive node then reports the missing build tag. `mihomo -v` lists `with_naive` when compiled in. Stable Linux ARM64 and AMD64 v1 releases link musl Cronet into the executable. Other ordinary builds omit Naive. The separate Naive workflow uploads native desktop bundles.
 
 ## Tests
 

@@ -65,6 +65,6 @@ NOWHERE_TEST_BINARY=/absolute/path/to/nowhere \
   go test -race ./pkg/nowhere/... ./adapter/outbound -run 'RustPortalInterop|Nowhere|Morph' -count=1 -timeout=3m
 ```
 
-Real interoperability tests require the pinned Rust v3.3.0 binary; without it they report a skip. They create temporary certificates and local TCP/UDP echo targets, require no external credentials, and terminate their Portal processes. The dedicated `Nowhere` workflow verifies release archive SHA-256 values and runs these tests on Linux, macOS and Windows for `Alpha` pushes and pull requests.
+Real interoperability tests require the pinned Rust v3.3.0 binary; without it they report a skip. They create temporary certificates and local TCP/UDP echo targets, require no external credentials, and terminate their Portal processes. The dedicated `Nowhere` workflow verifies release archive SHA-256 values and runs these tests on Linux, macOS and Windows for `main` pushes and pull requests.
 
 Darwin's default `net.inet.udp.maxdgram=9216` limits the real target socket: its live echo cases use up to 8192 bytes, while Linux/Windows use 60000 bytes. Codec/reassembly tests cover the protocol's 65535-byte bound independently of target sockets.

@@ -10,8 +10,8 @@
     <img src="https://goreportcard.com/badge/github.com/MetaCubeX/mihomo?style=flat-square">
   </a>
   <img src="https://img.shields.io/github/go-mod/go-version/MetaCubeX/mihomo/Alpha?style=flat-square">
-  <a href="https://github.com/MetaCubeX/mihomo/releases">
-    <img src="https://img.shields.io/github/release/MetaCubeX/mihomo/all.svg?style=flat-square">
+  <a href="https://github.com/openweir/mihomo/releases">
+    <img src="https://img.shields.io/github/release/openweir/mihomo/all.svg?style=flat-square">
   </a>
   <a href="https://github.com/MetaCubeX/mihomo">
     <img src="https://img.shields.io/badge/release-Meta-00b4f0?style=flat-square">
@@ -33,6 +33,20 @@
 NaiveProxy outbound is available in this fork with the `with_naive` build tag. See [Naive configuration and builds](docs/naive.md).
 
 Nowhere NW3 outbound (TLS/QUIC, TCP/UDP and Morph) is included in ordinary builds. See [Nowhere configuration and interoperability](docs/nowhere.md).
+
+## OpenWeir branches and releases
+
+`main` carries OpenWeir's changes and is the only branch releases come from. `Alpha` and
+`Meta` mirror MetaCubeX/mihomo unchanged; sync them from upstream and rebase `main` onto
+`Alpha` when picking up upstream work.
+
+To publish a stable kernel, update `VERSION` and `constant.Version` on `main` to a new
+`openweir-vMAJOR.MINOR.PATCH` (our own series, separate from the upstream `v*` tags).
+Every push to `main` whose `VERSION` has no tag yet releases it, so a failed release
+retries on the next push. After the build matrix and router checks pass, the OpenWeir Release workflow tags the
+tested commit and publishes the binaries and `sha256sums`; it also accepts the matching
+tag or a manual run on `main`. Linux ARM64 and AMD64 v1 stable binaries include
+statically linked Naive for OpenWrt.
 
 ## Dashboard
 

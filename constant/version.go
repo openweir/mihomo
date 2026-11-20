@@ -2,7 +2,7 @@ package constant
 
 var (
 	Meta       = true
-	Version    = "1.10.0"
+	Version    = "openweir-v1.0.0" // keep equal to VERSION; CI overrides it for alpha builds
 	BuildTime  = "unknown time"
 	MihomoName = "mihomo"
 )

@@ -3,7 +3,7 @@ name: Naive
 on:
   workflow_dispatch:
   push:
-    branches: [Meta]
+    branches: [main]
   pull_request:
 
 permissions:

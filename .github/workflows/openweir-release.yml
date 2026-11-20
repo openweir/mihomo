@@ -1,0 +1,153 @@
+# OpenWeir stable kernel releases. Kept apart from upstream's build.yml so
+# syncing MetaCubeX/mihomo never conflicts here; follow upstream Go bumps by hand.
+name: OpenWeir Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Stable version (defaults to the committed VERSION)"
+        required: false
+  push:
+    branches:
+      - main
+    tags:
+      - "openweir-v*"
+concurrency:
+  # One run per ref at a time, so a queued push sees the tag an earlier run published.
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: false
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      stable: ${{ steps.resolve.outputs.stable }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: resolve
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          bash .github/kernel-version.sh
+
+  build:
+    if: needs.version.outputs.stable == 'true'
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    strategy:
+      matrix:
+        jobs:
+          - { goarch: '386', go386: softfloat, output: '386-softfloat' }
+          - { goarch: amd64, goamd64: v1, output: amd64-v1, naive: naive }
+          - { goarch: arm64, output: arm64, naive: naive }
+          - { goarch: arm, goarm: '5', output: armv5 }
+          - { goarch: arm, goarm: '6', output: armv6 }
+          - { goarch: arm, goarm: '7', output: armv7 }
+          - { goarch: mips, gomips: softfloat, output: mips-softfloat }
+          - { goarch: mipsle, gomips: softfloat, output: mipsle-softfloat }
+          - { goarch: riscv64, output: riscv64 }
+          - { goarch: loong64, output: loong64-abi2 }
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-download-base-url: 'https://github.com/MetaCubeX/go/releases/download/build'
+          go-version: '1.26'
+
+      - name: Update CA
+        run: |
+          sudo apt-get update && sudo apt-get install ca-certificates
+          sudo update-ca-certificates
+          cp -f /etc/ssl/certs/ca-certificates.crt component/ca/ca-certificates.crt
+
+      - name: Install pinned static toolchain for Naive
+        if: matrix.jobs.naive == 'naive'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zig"
+          echo 'ziglang==0.15.2 --hash=sha256:806316453d1ede7174ed3fefb8e5348154629089c3bb5fe812dfd0e172fac130' | \
+            "$RUNNER_TEMP/zig/bin/pip" install --require-hashes --only-binary=:all: -r /dev/stdin
+          zig=$("$RUNNER_TEMP/zig/bin/python" -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).with_name("zig"))')
+          echo "OPENWEIR_ZIG=$zig" >> "$GITHUB_ENV"
+
+      - name: Build core
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.jobs.goarch }}
+          GOAMD64: ${{ matrix.jobs.goamd64 }}
+          GO386: ${{ matrix.jobs.go386 }}
+          GOARM: ${{ matrix.jobs.goarm }}
+          GOMIPS: ${{ matrix.jobs.gomips }}
+          GOTOOLCHAIN: local
+        run: |
+          out="mihomo-linux-${{ matrix.jobs.output }}"
+          if [[ -n ${OPENWEIR_ZIG:-} ]]; then
+            scripts/build-router-naive.sh
+            if readelf -lW mihomo | grep -q INTERP || readelf -dW mihomo | grep -q NEEDED; then
+              echo 'Router kernel has runtime library dependencies' >&2; exit 1
+            fi
+            notice="$(go list -m -f '{{.Dir}}' "github.com/sagernet/cronet-go/lib/linux_${GOARCH}_musl")/LICENSE"
+            cp "$notice" "NOTICE-cronet-linux-$GOARCH.txt"
+          else
+            CGO_ENABLED=0 go build -v -tags with_gvisor -trimpath \
+              -ldflags "-extldflags --static -X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=$(date)' -w -s -buildid="
+          fi
+          gzip -c mihomo > "$out-$VERSION.gz"
+          echo "$VERSION" > version.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.jobs.output }}
+          path: |
+            mihomo-linux-*.gz
+            NOTICE-cronet-linux-*.txt
+            version.txt
+
+  verify-router:
+    needs: [version, build]
+    strategy:
+      matrix:
+        include:
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+          - { runner: ubuntu-24.04, arch: amd64-v1 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-${{ matrix.arch }}
+          path: bin
+      - name: Run the packaged core on the target architecture
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          gzip -dc "bin/mihomo-linux-$ARCH-$VERSION.gz" > "$RUNNER_TEMP/mihomo"
+          chmod +x "$RUNNER_TEMP/mihomo"
+          sh .github/check-router-kernel.sh "$RUNNER_TEMP/mihomo" "$VERSION"
+
+  publish:
+    permissions:
+      contents: write
+    needs: [version, build, verify-router]
+    concurrency: publish-kernel-${{ needs.version.outputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          path: bin
+          merge-multiple: true
+      - name: Publish verified assets from this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: bash .github/publish-kernel.sh bin
