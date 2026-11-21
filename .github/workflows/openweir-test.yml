@@ -1,12 +1,12 @@
-# Tests for OpenWeir's main branch. Upstream's test.yml stays untouched and keeps
-# watching the upstream mirror branches (Alpha, Meta).
+# Tests for OpenWeir's Alpha branch (upstream Alpha plus OpenWeir's changes). Upstream's test.yml
+# stays untouched and runs as well.
 name: OpenWeir Test
 on:
   push:
-    branches: [main]
+    branches: [Alpha]
     paths-ignore: ["docs/**", "README.md"]
   pull_request:
-    branches: [main]
+    branches: [Alpha]
 jobs:
   test:
     strategy:

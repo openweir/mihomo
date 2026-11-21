@@ -3,9 +3,9 @@ name: Nowhere
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [Alpha]
   pull_request:
-    branches: [main]
+    branches: [Alpha]
 
 permissions:
   contents: read

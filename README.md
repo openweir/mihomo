@@ -36,16 +36,18 @@ Nowhere NW3 outbound (TLS/QUIC, TCP/UDP and Morph) is included in ordinary build
 
 ## OpenWeir branches and releases
 
-`main` carries OpenWeir's changes and is the only branch releases come from. `Alpha` and
-`Meta` mirror MetaCubeX/mihomo unchanged; sync them from upstream and rebase `main` onto
-`Alpha` when picking up upstream work.
+`Alpha` is MetaCubeX/mihomo's Alpha with OpenWeir's changes merged in, and the only branch
+releases come from. Pick up upstream work with `git merge upstream/Alpha`; `git log
+upstream/Alpha..Alpha` lists what OpenWeir adds. Upstream's own workflows stay as they are:
+`Build` also publishes a `Prerelease-Alpha` pre-release here, and its Docker and CMFA steps fail
+without MetaCubeX's secrets. `Meta` mirrors upstream unchanged.
 
-To publish a stable kernel, update `VERSION` and `constant.Version` on `main` to a new
+To publish a stable kernel, update `VERSION` and `constant.Version` on `Alpha` to a new
 `openweir-vMAJOR.MINOR.PATCH` (our own series, separate from the upstream `v*` tags).
-Every push to `main` whose `VERSION` has no tag yet releases it, so a failed release
+Every push to `Alpha` whose `VERSION` has no tag yet releases it, so a failed release
 retries on the next push. After the build matrix and router checks pass, the OpenWeir Release workflow tags the
 tested commit and publishes the binaries and `sha256sums`; it also accepts the matching
-tag or a manual run on `main`. Linux ARM64 and AMD64 v1 stable binaries include
+tag or a manual run on `Alpha`. Linux ARM64 and AMD64 v1 stable binaries include
 statically linked Naive for OpenWrt.
 
 ## Dashboard
