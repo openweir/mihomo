@@ -263,6 +263,8 @@ func TestMrsParseRejectsMalformed(t *testing.T) {
 		{"negative extra", P.Domain, compress(t, append(mrsHeader(P.Domain, 2, -1), body...))},
 		{"extra past end", P.Domain, compress(t, append(mrsHeader(P.Domain, 2, int64(len(body)+1)), body...))},
 		{"huge extra", P.Domain, compress(t, append(mrsHeader(P.Domain, 2, 1<<40), body...))},
+		{"huge domain set", P.Domain, compress(t, binary.BigEndian.AppendUint64(append(mrsHeader(P.Domain, 2, 0), 1), 1<<40))},
+		{"huge cidr set", P.IPCIDR, compress(t, binary.BigEndian.AppendUint64(append(mrsHeader(P.IPCIDR, 2, 0), 1), 1<<40))},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

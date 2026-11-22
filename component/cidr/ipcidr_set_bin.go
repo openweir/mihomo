@@ -54,7 +54,7 @@ func ReadIpCidrSet(r io.Reader) (ss *IpCidrSet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if length < 1 {
+	if length < 1 || !lengthFits(r, length, 32) {
 		return nil, errors.New("length is invalid")
 	}
 	ss.rr = make([]netipx.IPRange, length)
@@ -74,4 +74,13 @@ func ReadIpCidrSet(r io.Reader) (ss *IpCidrSet, err error) {
 	}
 
 	return ss, nil
+}
+
+// lengthFits reports whether r still holds length items of size bytes, when r can tell
+// (a bytes.Reader can), so a corrupt length is rejected before it is allocated.
+func lengthFits(r io.Reader, length, size int64) bool {
+	if remaining, ok := r.(interface{ Len() int }); ok {
+		return length <= int64(remaining.Len())/size
+	}
+	return true
 }

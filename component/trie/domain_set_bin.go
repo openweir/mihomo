@@ -69,7 +69,7 @@ func ReadDomainSetBin(r io.Reader) (ds *DomainSet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if length < 1 {
+	if length < 1 || !lengthFits(r, length, 8) {
 		return nil, errors.New("length is invalid")
 	}
 	ds.leaves = make([]uint64, length)
@@ -85,7 +85,7 @@ func ReadDomainSetBin(r io.Reader) (ds *DomainSet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if length < 1 {
+	if length < 1 || !lengthFits(r, length, 8) {
 		return nil, errors.New("length is invalid")
 	}
 	ds.labelBitmap = make([]uint64, length)
@@ -101,7 +101,7 @@ func ReadDomainSetBin(r io.Reader) (ds *DomainSet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if length < 1 {
+	if length < 1 || !lengthFits(r, length, 1) {
 		return nil, errors.New("length is invalid")
 	}
 	ds.labels = make([]byte, length)
@@ -112,4 +112,13 @@ func ReadDomainSetBin(r io.Reader) (ds *DomainSet, err error) {
 
 	ds.init()
 	return ds, nil
+}
+
+// lengthFits reports whether r still holds length items of size bytes, when r can tell
+// (a bytes.Reader can), so a corrupt length is rejected before it is allocated.
+func lengthFits(r io.Reader, length, size int64) bool {
+	if remaining, ok := r.(interface{ Len() int }); ok {
+		return length <= int64(remaining.Len())/size
+	}
+	return true
 }
