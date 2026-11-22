@@ -11,17 +11,17 @@ release=false
 case "$GITHUB_EVENT_NAME:$GITHUB_REF_TYPE" in
   push:tag)
     [[ $GITHUB_REF_NAME == "$version" ]] || { echo 'Tag differs from VERSION' >&2; exit 1; }
-    git merge-base --is-ancestor HEAD origin/main || { echo "Tag is outside main history" >&2; exit 1; }
+    git merge-base --is-ancestor HEAD origin/Alpha || { echo "Tag is outside Alpha history" >&2; exit 1; }
     release=true ;;
   workflow_dispatch:*)
-    [[ $GITHUB_REF_NAME == main || $GITHUB_REF_NAME == "$version" ]] || exit 1
-    git merge-base --is-ancestor HEAD origin/main || { echo "Requested commit is outside main history" >&2; exit 1; }
+    [[ $GITHUB_REF_NAME == Alpha || $GITHUB_REF_NAME == "$version" ]] || exit 1
+    git merge-base --is-ancestor HEAD origin/Alpha || { echo "Requested commit is outside Alpha history" >&2; exit 1; }
     [[ -z ${REQUESTED_VERSION:-} || $REQUESTED_VERSION == "$version" ]] || { echo 'Requested version differs from VERSION' >&2; exit 1; }
     release=true ;;
   push:branch)
-    # Release whenever main carries a VERSION that has not been published yet, so the
+    # Release whenever Alpha carries a VERSION that has not been published yet, so the
     # first push after a bump releases it and a failed release retries on the next push.
-    if [[ $GITHUB_REF_NAME == main ]]; then
+    if [[ $GITHUB_REF_NAME == Alpha ]]; then
       if git ls-remote --exit-code --tags origin "refs/tags/$version" > /dev/null; then
         :
       else
