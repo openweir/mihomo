@@ -157,6 +157,8 @@ func TestMrsRoundTrip(t *testing.T) {
 
 			mrs := convertToMrs(t, test.behavior, P.TextRule, text)
 			payload := decompress(t, mrs)
+			window, _ := frameWindow(t, mrs)
+			assert.LessOrEqual(t, window, max(uint64(len(payload)), zstd.MinWindowSize), "window fits the content")
 
 			// Older cores read MRS files with a streaming decoder.
 			stream, err := zstd.NewReader(bytes.NewReader(mrs))

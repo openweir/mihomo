@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -33,50 +34,55 @@ func ConvertToMrs(buf []byte, behavior P.RuleBehavior, format P.RuleFormat, w io
 			return nil
 		}
 
-		var encoder *zstd.Encoder
-		encoder, err = zstd.NewWriter(w)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			zstdErr := encoder.Close()
-			if err == nil {
-				err = zstdErr
-			}
-		}()
+		// Compressed in one piece below, so that the frame records the payload's size and a window
+		// no larger than it. zstd's streaming encoder declares an 8 MiB window, which streaming
+		// readers (older cores among them) allocate in full even for a small set.
+		payload := new(bytes.Buffer)
 
 		// header
-		_, err = encoder.Write(MrsMagicBytes[:])
+		_, err = payload.Write(MrsMagicBytes[:])
 		if err != nil {
 			return err
 		}
 
 		// behavior
 		_behavior := []byte{behavior.Byte()}
-		_, err = encoder.Write(_behavior[:])
+		_, err = payload.Write(_behavior[:])
 		if err != nil {
 			return err
 		}
 
 		// count
 		count := int64(_strategy.Count())
-		err = binary.Write(encoder, binary.BigEndian, count)
+		err = binary.Write(payload, binary.BigEndian, count)
 		if err != nil {
 			return err
 		}
 
 		// extra (reserved for future using)
 		var extra []byte
-		err = binary.Write(encoder, binary.BigEndian, int64(len(extra)))
+		err = binary.Write(payload, binary.BigEndian, int64(len(extra)))
 		if err != nil {
 			return err
 		}
-		_, err = encoder.Write(extra)
+		_, err = payload.Write(extra)
 		if err != nil {
 			return err
 		}
 
-		return _strategy.WriteMrs(encoder)
+		err = _strategy.WriteMrs(payload)
+		if err != nil {
+			return err
+		}
+
+		var encoder *zstd.Encoder
+		encoder, err = zstd.NewWriter(nil, zstd.WithEncoderConcurrency(1))
+		if err != nil {
+			return err
+		}
+		defer encoder.Close()
+		_, err = w.Write(encoder.EncodeAll(payload.Bytes(), nil))
+		return err
 	} else {
 		return ErrInvalidFormat
 	}
