@@ -12,13 +12,34 @@ import (
 
 var MrsMagicBytes = [4]byte{'M', 'R', 'S', 1} // MRSv1
 
+// mrsMaxDecodedSize bounds what one MRS file may decompress to, so a crafted file cannot
+// expand without limit. Real sets stay far below it: MetaCubeX geosite-cn decodes to 0.9 MiB.
+const mrsMaxDecodedSize = 256 << 20
+
+// mrsDecode decompresses a whole MRS file. A streaming zstd reader allocates a history as large
+// as the frame's window, 8 MiB for files from zstd's default encoder however small they are,
+// while DecodeAll decodes straight into the output. The decoder is not shared: an idle one
+// keeps its buffers and a reference to the last output it produced.
+func mrsDecode(buf []byte) ([]byte, error) {
+	decoder, err := zstd.NewReader(nil,
+		zstd.WithDecoderConcurrency(1),
+		zstd.WithDecoderLowmem(true),
+		zstd.WithDecoderMaxMemory(mrsMaxDecodedSize),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer decoder.Close()
+	return decoder.DecodeAll(buf, nil)
+}
+
 func rulesMrsParse(buf []byte, strategy ruleStrategy) (ruleStrategy, error) {
 	if _strategy, ok := strategy.(mrsRuleStrategy); ok {
-		reader, err := zstd.NewReader(bytes.NewReader(buf))
+		decoded, err := mrsDecode(buf)
 		if err != nil {
 			return nil, err
 		}
-		defer reader.Close()
+		reader := bytes.NewReader(decoded)
 
 		// header
 		var header [4]byte
@@ -53,7 +74,7 @@ func rulesMrsParse(buf []byte, strategy ruleStrategy) (ruleStrategy, error) {
 		if err != nil {
 			return nil, err
 		}
-		if length < 0 {
+		if length < 0 || length > int64(reader.Len()) {
 			return nil, errors.New("length is invalid")
 		}
 		if length > 0 {
